@@ -4,6 +4,18 @@ import numpy as np
 num_notes = 96
 samples_per_measure = 96
 
+def find_piano_tracks(mid):
+
+	piano_tracks = [0] # include the 0th element because it often has time signature data
+	for i, track in enumerate(mid.tracks):
+		for msg in track:
+			if msg.type == 'program_change':
+				if 0 <= msg.program < 6:
+					print("found piano in track {}".format(i))
+					piano_tracks.append(i)
+	return piano_tracks
+
+
 def midi_to_samples(fname):
 	has_time_sig = False
 	flag_warning = False
@@ -11,7 +23,9 @@ def midi_to_samples(fname):
 	ticks_per_beat = mid.ticks_per_beat
 	ticks_per_measure = 4 * ticks_per_beat
 
-	for i, track in enumerate(mid.tracks):
+	piano_tracks_idxs = find_piano_tracks(mid)
+
+	for i, track in enumerate(np.array(mid.tracks)[piano_tracks_idxs]):
 		for msg in track:
 			if msg.type == 'time_signature':
 				new_tpm = msg.numerator * ticks_per_beat * 4 / msg.denominator
@@ -27,13 +41,11 @@ def midi_to_samples(fname):
 		return []
 	
 	all_notes = {}
-	for i, track in enumerate(mid.tracks):
+	for i, track in enumerate(np.array(mid.tracks)[piano_tracks_idxs]):
 		abs_time = 0
 		for msg in track:
 			abs_time += msg.time
-			if msg.type == 'note_on':
-				if msg.velocity == 0:
-					continue
+			if msg.type == 'note_on' and msg.velocity != 0:
 				note = msg.note - (128 - num_notes)//2 # changed to integer division
 				assert(note >= 0 and note < num_notes)
 				if note not in all_notes:
@@ -43,10 +55,12 @@ def midi_to_samples(fname):
 					if len(single_note) == 1:
 						single_note.append(single_note[0] + 1)
 				all_notes[note].append([int(abs_time * samples_per_measure / ticks_per_measure)])
-			elif msg.type == 'note_off':
+				
+			elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
 				if len(all_notes[note][-1]) != 1:
 					continue
 				all_notes[note][-1].append(int(abs_time * samples_per_measure / ticks_per_measure))
+
 	for note in all_notes:
 		for start_end in all_notes[note]:
 			if len(start_end) == 1:
