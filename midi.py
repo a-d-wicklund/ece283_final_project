@@ -20,10 +20,10 @@ def midi_to_samples(fname):
 				ticks_per_measure = new_tpm
 				has_time_sig = True
 	if flag_warning:
-		print "  ^^^^^^ WARNING ^^^^^^"
-		print "    " + fname
-		print "    Detected multiple distinct time signatures."
-		print "  ^^^^^^ WARNING ^^^^^^"
+		print("  ^^^^^^ WARNING ^^^^^^")
+		print("    " + fname)
+		print("    Detected multiple distinct time signatures.")
+		print("  ^^^^^^ WARNING ^^^^^^")
 		return []
 	
 	all_notes = {}
@@ -34,7 +34,7 @@ def midi_to_samples(fname):
 			if msg.type == 'note_on':
 				if msg.velocity == 0:
 					continue
-				note = msg.note - (128 - num_notes)/2
+				note = msg.note - (128 - num_notes)//2 # changed to integer division
 				assert(note >= 0 and note < num_notes)
 				if note not in all_notes:
 					all_notes[note] = []
@@ -42,19 +42,20 @@ def midi_to_samples(fname):
 					single_note = all_notes[note][-1]
 					if len(single_note) == 1:
 						single_note.append(single_note[0] + 1)
-				all_notes[note].append([abs_time * samples_per_measure / ticks_per_measure])
+				all_notes[note].append([int(abs_time * samples_per_measure / ticks_per_measure)])
 			elif msg.type == 'note_off':
 				if len(all_notes[note][-1]) != 1:
 					continue
-				all_notes[note][-1].append(abs_time * samples_per_measure / ticks_per_measure)
+				all_notes[note][-1].append(int(abs_time * samples_per_measure / ticks_per_measure))
 	for note in all_notes:
 		for start_end in all_notes[note]:
 			if len(start_end) == 1:
 				start_end.append(start_end[0] + 1)
 	samples = []
 	for note in all_notes:
+		# For each note being played, go
 		for start, end in all_notes[note]:
-			sample_ix = start / samples_per_measure
+			sample_ix = start // samples_per_measure
 			while len(samples) <= sample_ix:
 				samples.append(np.zeros((samples_per_measure, num_notes), dtype=np.uint8))
 			sample = samples[sample_ix]
@@ -65,6 +66,7 @@ def midi_to_samples(fname):
 					sample[start_ix, note] = 1
 					start_ix += 1
 			else:
+				# print(type(start_ix), type(note))
 				sample[start_ix, note] = 1
 	return samples
 
@@ -78,9 +80,9 @@ def samples_to_midi(samples, fname, ticks_per_sample, thresh=0.5):
 	abs_time = 0
 	last_time = 0
 	for sample in samples:
-		for y in xrange(sample.shape[0]):
+		for y in range(sample.shape[0]):
 			abs_time += ticks_per_sample
-			for x in xrange(sample.shape[1]):
+			for x in range(sample.shape[1]):
 				note = x + (128 - num_notes)/2
 				if sample[y,x] >= thresh and (y == 0 or sample[y-1,x] < thresh):
 					delta_time = abs_time - last_time
