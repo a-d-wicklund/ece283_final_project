@@ -18,14 +18,19 @@ def find_piano_tracks(mid):
 
 def midi_to_samples(fname):
 
-	##################################################################
-	# Takes in a filename for a midi file and produces a list of numpy 
-	# arrays, each of which contains many measures and each measure has a 
-	# specified number of samples. Default is 96 samples per measure. 96 
-	# notes are accounted for. The function isolates piano music from the 
-	# midi file. There may be multiple pianos on a single song, so these are
-	# separated
-	###################################################################
+	"""
+	Construct matrix form of midi songs
+	
+	Input:	fname : string
+	            file name of midi file
+	
+	Output:	samples : list of numpy arrays
+	            Each numpy array is (N x samples_per_measure x num_notes)
+	            where N is the number of measures for that instrument
+	            It is a list because there can be multiple piano tracks in a song
+	"""
+
+	
 	has_time_sig = False
 	flag_warning = False
 	mid = MidiFile(fname)
@@ -117,7 +122,16 @@ def midi_to_samples(fname):
 					sample[start_ix, note] = 1
 
 		if samples: # if there are actually music notes in this track
-			all_samples.append(samples)
+			all_samples.append(np.array(samples))
+
+	# Remove all measures containing no piano notes
+	for i, inst in enumerate(all_samples):
+		del_list = []
+		for j, measure in enumerate(inst):
+			if np.all(measure == 0):
+				del_list.append(j)
+		all_samples[i] = np.delete(all_samples[i], del_list, axis=0)
+
 	return all_samples
 
 def samples_to_midi(samples, fname, ticks_per_sample, thresh=0.5):
