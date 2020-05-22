@@ -4,14 +4,37 @@ import numpy as np
 num_notes = 96
 samples_per_measure = 96
 
+def find_piano_tracks(mid):
+
+	piano_tracks = [0] # include the 0th element because it often has time signature data
+	for i, track in enumerate(mid.tracks):
+		for msg in track:
+			if msg.type == 'program_change':
+				if 0 <= msg.program < 6:
+					print("found piano in track {}".format(i))
+					piano_tracks.append(i)
+	return piano_tracks
+
+
 def midi_to_samples(fname):
+
+	##################################################################
+	# Takes in a filename for a midi file and produces a list of numpy 
+	# arrays, each of which contains many measures and each measure has a 
+	# specified number of samples. Default is 96 samples per measure. 96 
+	# notes are accounted for. The function isolates piano music from the 
+	# midi file. There may be multiple pianos on a single song, so these are
+	# separated
+	###################################################################
 	has_time_sig = False
 	flag_warning = False
 	mid = MidiFile(fname)
 	ticks_per_beat = mid.ticks_per_beat
 	ticks_per_measure = 4 * ticks_per_beat
 
-	for i, track in enumerate(mid.tracks):
+	piano_tracks_idxs = find_piano_tracks(mid)
+
+	for i, track in enumerate(np.array(mid.tracks)[piano_tracks_idxs]):
 		for msg in track:
 			if msg.type == 'time_signature':
 				new_tpm = msg.numerator * ticks_per_beat * 4 / msg.denominator
@@ -20,53 +43,82 @@ def midi_to_samples(fname):
 				ticks_per_measure = new_tpm
 				has_time_sig = True
 	if flag_warning:
-		print "  ^^^^^^ WARNING ^^^^^^"
-		print "    " + fname
-		print "    Detected multiple distinct time signatures."
-		print "  ^^^^^^ WARNING ^^^^^^"
+		print("  ^^^^^^ WARNING ^^^^^^")
+		print("    " + fname)
+		print("    Detected multiple distinct time signatures.")
+		print("  ^^^^^^ WARNING ^^^^^^")
 		return []
 	
-	all_notes = {}
-	for i, track in enumerate(mid.tracks):
+	# Create a dictionary of notes. The key-value pair consists of a note as the key and a list 
+	# of start-stop times as the value. 
+
+	all_notes = []
+	for i, track in enumerate(np.array(mid.tracks)[piano_tracks_idxs]):
+		all_notes_inst = {}
 		abs_time = 0
-		for msg in track:
+		for j, msg in enumerate(track):
+			# FOR DEBUGGING PURPOSES
+			if j == 40:
+				print("nothing")
+			# END DEBUGGING
+
 			abs_time += msg.time
-			if msg.type == 'note_on':
-				if msg.velocity == 0:
-					continue
-				note = msg.note - (128 - num_notes)/2
+			if msg.type == 'note_on' and msg.velocity != 0:
+				note = msg.note - (128 - num_notes) // 2 # Scale down note value (Why?)
 				assert(note >= 0 and note < num_notes)
-				if note not in all_notes:
-					all_notes[note] = []
+				if note not in all_notes_inst:
+					# Create a new note item in the dictionary
+					all_notes_inst[note] = []
 				else:
-					single_note = all_notes[note][-1]
+					# append note event to the end of the list for that note
+					single_note = all_notes_inst[note][-1]
+					# first check that there's not a hanging "note_on" event 
 					if len(single_note) == 1:
+						print("found hanging note_on event")
 						single_note.append(single_note[0] + 1)
-				all_notes[note].append([abs_time * samples_per_measure / ticks_per_measure])
-			elif msg.type == 'note_off':
-				if len(all_notes[note][-1]) != 1:
+				# Append the sample number to a new start-stop pair for the start
+				all_notes_inst[note].append([int(abs_time * samples_per_measure / ticks_per_measure)])
+				
+			elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
+				note = msg.note - (128 - num_notes) // 2 # Scale down note value (Why?)
+				if len(all_notes_inst[note][-1]) != 1:
+					print("encountered note_off event without note_on event")
 					continue
-				all_notes[note][-1].append(abs_time * samples_per_measure / ticks_per_measure)
-	for note in all_notes:
-		for start_end in all_notes[note]:
-			if len(start_end) == 1:
-				start_end.append(start_end[0] + 1)
-	samples = []
-	for note in all_notes:
-		for start, end in all_notes[note]:
-			sample_ix = start / samples_per_measure
-			while len(samples) <= sample_ix:
-				samples.append(np.zeros((samples_per_measure, num_notes), dtype=np.uint8))
-			sample = samples[sample_ix]
-			start_ix = start - sample_ix * samples_per_measure
-			if False:
-				end_ix = min(end - sample_ix * samples_per_measure, samples_per_measure)
-				while start_ix < end_ix:
+				all_notes_inst[note][-1].append(int(abs_time * samples_per_measure / ticks_per_measure))
+		all_notes.append(all_notes_inst)
+
+	# Make sure there are no hanging "note_on" events
+	for notes in all_notes:
+		for note in notes:
+			for start_end in notes[note]:
+				if len(start_end) == 1:
+					print("found hanging note_on event")
+					start_end.append(start_end[0] + 1)
+
+	# Now we have a dictionary made of note:start-stop list pairs. 
+
+	all_samples = []
+	for notes in all_notes:
+		samples = []
+		for note in notes:
+			# For each note
+			for start, end in notes[note]:
+				sample_ix = start // samples_per_measure
+				while len(samples) <= sample_ix:
+					samples.append(np.zeros((samples_per_measure, num_notes), dtype=np.uint8))
+				sample = samples[sample_ix]
+				start_ix = start - sample_ix * samples_per_measure
+				if True: # set to true if you want notes that are held to be shown as such
+					end_ix = min(end - sample_ix * samples_per_measure, samples_per_measure)
+					while start_ix < end_ix:
+						sample[start_ix, note] = 1
+						start_ix += 1
+				else:
 					sample[start_ix, note] = 1
-					start_ix += 1
-			else:
-				sample[start_ix, note] = 1
-	return samples
+
+		if samples: # if there are actually music notes in this track
+			all_samples.append(samples)
+	return all_samples
 
 def samples_to_midi(samples, fname, ticks_per_sample, thresh=0.5):
 	mid = MidiFile()
@@ -78,9 +130,9 @@ def samples_to_midi(samples, fname, ticks_per_sample, thresh=0.5):
 	abs_time = 0
 	last_time = 0
 	for sample in samples:
-		for y in xrange(sample.shape[0]):
+		for y in range(sample.shape[0]):
 			abs_time += ticks_per_sample
-			for x in xrange(sample.shape[1]):
+			for x in range(sample.shape[1]):
 				note = x + (128 - num_notes)/2
 				if sample[y,x] >= thresh and (y == 0 or sample[y-1,x] < thresh):
 					delta_time = abs_time - last_time
