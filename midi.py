@@ -61,10 +61,6 @@ def midi_to_samples(fname):
         all_notes_inst = {}
         abs_time = 0
         for j, msg in enumerate(track):
-            # FOR DEBUGGING PURPOSES
-            if j == 40:
-                print("nothing")
-            # END DEBUGGING
 
             abs_time += msg.time
             if msg.type == 'note_on' and msg.velocity != 0:
@@ -127,37 +123,45 @@ def midi_to_samples(fname):
 
 
     # Implement as list, generate_add_centered_transpose in util.py iterates through measures and appends at end. too slow for array.
-    # # Remove all measures containing no piano notes
-    # for i, inst in enumerate(all_samples):
-    #     del_list = []
-    #     for j, measure in enumerate(inst):
-    #         if np.all(measure == 0):
-    #             del_list.append(j)
-    #     all_samples[i] = np.delete(all_samples[i], del_list, axis=0)
+    # Remove all measures containing no piano notes
+    for i, inst in enumerate(all_samples):
+        del_list = []
+        for j, measure in enumerate(inst):
+            if np.all(measure == 0):
+                print('found empty measure in instrument {}, measure {}'.format(i, j))
+                del_list.append(j)
+        for index in sorted(del_list, reverse=True):
+            del all_samples[i][index]
+        # all_samples[i] = np.delete(all_samples[i], del_list, axis=0)
 
     return all_samples
 
 
-def samples_to_midi(samples, fname, ticks_per_sample, thresh=0.5):
+def samples_to_midi(samples, fname, thresh=0.5):
+    # Inputs:
+    #   samples : list of 96 x 96 numpy arrays
+    #   fname : output filename
+    #   ticks
     mid = MidiFile()
     track = MidiTrack()
     mid.tracks.append(track)
     ticks_per_beat = mid.ticks_per_beat
     ticks_per_measure = 4 * ticks_per_beat
-    ticks_per_sample = ticks_per_measure / samples_per_measure
+    ticks_per_sample = ticks_per_measure // samples_per_measure
     abs_time = 0
     last_time = 0
     for sample in samples:
         for y in range(sample.shape[0]):
             abs_time += ticks_per_sample
             for x in range(sample.shape[1]):
-                note = x + (128 - num_notes) / 2
+                note = int(x + (128 - num_notes) // 2)
+                # Only do a note on event if the sample before it was off
                 if sample[y, x] >= thresh and (y == 0 or sample[y - 1, x] < thresh):
                     delta_time = abs_time - last_time
                     track.append(Message('note_on', note=note, velocity=127, time=delta_time))
                     last_time = abs_time
                 if sample[y, x] >= thresh and (y == sample.shape[0] - 1 or sample[y + 1, x] < thresh):
                     delta_time = abs_time - last_time
-                    track.append(Message('note_off', note=note, velocity=127, time=delta_time))
+                    track.append(Message('note_on', note=note, velocity=0, time=delta_time))
                     last_time = abs_time
     mid.save(fname)
