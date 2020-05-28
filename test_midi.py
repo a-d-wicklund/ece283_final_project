@@ -16,5 +16,5 @@ import midi
 
 # Test Converting back to MIDI
 
-samples = np.load('samples.npy')
-midi.samples_to_midi(samples, fname='midi_out.mid')
+# samples = np.load('samples.npy')
+# midi.samples_to_midi(samples, fname='midi_out.mid')

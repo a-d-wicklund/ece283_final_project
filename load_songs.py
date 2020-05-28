@@ -1,3 +1,10 @@
+"""
+Load all songs in midi format from directory and subdirectories and save them
+as a numpy array of samples (in .npy file format). The numpy array takes the form
+(N x 96 x 96), where N is the total number of measures taken from the midi files
+
+"""
+
 import midi
 import os
 import util
