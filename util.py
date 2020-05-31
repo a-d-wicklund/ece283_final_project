@@ -1,5 +1,5 @@
 import numpy as np
-import cv2
+# import cv2
 import os
 
 
@@ -14,6 +14,14 @@ def transpose_range(samples):  # Calculates lowest and highest note.
 
 
 def generate_add_centered_transpose(samples):
+    """
+    Input:
+        samples : list of (96 x 96) numpy arrays 
+    Output:
+        out_samples : original samples appended with note-shifted version
+        out_lens : array of two numbers: number of measures and number of appended measures.
+    """
+
     num_notes = samples[0].shape[1]
     min_note, max_note = transpose_range(samples)
     s = int(num_notes / 2 - (max_note + min_note) / 2)   # Why is this necessary??
@@ -43,18 +51,19 @@ def generate_all_transpose(samples, radius=6):
     return out_samples, out_lens
 
 
-def sample_to_pic(fname, sample, thresh=None):
-    if thresh is not None:
-        inverted = np.where(sample > thresh, 0, 1)
-    else:
-        inverted = 1.0 - sample
-    cv2.imwrite(fname, inverted * 255)
+# def sample_to_pic(fname, sample, thresh=None):
+#     if thresh is not None:
+#         inverted = np.where(sample > thresh, 0, 1)
+#     else:
+#         inverted = 1.0 - sample
+#     cv2.imwrite(fname, inverted * 255)
 
 
-def samples_to_pics(dir, samples, thresh=None):
-    if not os.path.exists(dir): os.makedirs(dir)
-    for i in range(samples.shape[0]):
-        sample_to_pic(dir + '/s' + str(i) + '.png', samples[i], thresh)
+# def samples_to_pics(dir, samples, thresh=None):
+#     if not os.path.exists(dir): os.makedirs(dir)
+#     for i in range(samples.shape[0]):
+#         sample_to_pic(dir + '/s' + str(i) + '.png', samples[i], thresh)
+
 
 
 def pad_songs(y, y_lens, max_len):
@@ -111,3 +120,4 @@ def e_to_samples(e_samples, lookup):
         for j in range(m):
             samples[i, j] = lookup[e_samples[i, j]]
     return samples
+
