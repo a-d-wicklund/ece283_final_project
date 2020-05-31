@@ -16,7 +16,8 @@ all_samples = []
 all_lens = []
 print("Loading Songs...")
 
-for root, _, files in os.walk('.\\Classical_Piano_piano-midi.de_MIDIRip\\mozart', topdown=False):  # Was testing with single folder
+
+for root, _, files in os.walk('./Classical_Piano_piano-midi.de_MIDIRip/mozart', topdown=False):  # Was testing with single folder
     for file in files:
         path = os.path.join(root, file)
         if not (path.endswith('.mid') or path.endswith('.midi')):
@@ -28,6 +29,7 @@ for root, _, files in os.walk('.\\Classical_Piano_piano-midi.de_MIDIRip\\mozart'
             print("ERROR: ", path)
             continue
         for track in tracks:
+
             if len(track) < 8:  # If less than 8 measures, discard.
                 continue
 
@@ -37,6 +39,7 @@ for root, _, files in os.walk('.\\Classical_Piano_piano-midi.de_MIDIRip\\mozart'
             all_samples += samples
             all_lens += lens
         
+
 
 assert (sum(all_lens) == len(all_samples))
 print("Saving " + str(len(all_samples)) + " samples...")

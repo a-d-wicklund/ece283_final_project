@@ -21,6 +21,7 @@ def generate_add_centered_transpose(samples):
         out_samples : original samples appended with note-shifted version
         out_lens : array of two numbers: number of measures and number of appended measures.
     """
+
     num_notes = samples[0].shape[1]
     min_note, max_note = transpose_range(samples)
     s = int(num_notes / 2 - (max_note + min_note) / 2)   # Why is this necessary??
@@ -62,6 +63,7 @@ def generate_all_transpose(samples, radius=6):
 #     if not os.path.exists(dir): os.makedirs(dir)
 #     for i in range(samples.shape[0]):
 #         sample_to_pic(dir + '/s' + str(i) + '.png', samples[i], thresh)
+
 
 
 def pad_songs(y, y_lens, max_len):
