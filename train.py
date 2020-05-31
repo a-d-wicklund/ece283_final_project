@@ -6,7 +6,8 @@ import pydot
 import util
 import midi
 
-NUM_EPOCHS = 2000
+# NUM_EPOCHS = 2000
+NUM_EPOCHS = 10 # This low number is temporary. Should be used only until we can use a GPU
 LR = 0.001
 CONTINUE_TRAIN = False
 PLAY_ONLY = False
@@ -81,6 +82,8 @@ from tensorflow.keras import regularizers
 from tensorflow.keras.layers import Layer
 K.set_image_data_format('channels_first')
 
+tensorflow.compat.v1.disable_eager_execution() # So that K.function works
+
 #Fix the random seed so that training comparisons are easier to make
 np.random.seed(0)
 random.seed(0)
@@ -97,11 +100,13 @@ print("Loading Data...")
 y_samples = np.load('samples.npy')
 y_lengths = np.load('lengths.npy')
 num_samples = y_samples.shape[0] # Get the number of measures
-num_songs = y_lengths.shape[0] # Get number of "songs"
+num_songs = y_lengths.shape[0] # Get number of "songs". One song is essentially one track
 print("Loaded " + str(num_samples) + " samples from " + str(num_songs) + " songs.")
 print(np.sum(y_lengths))
 assert(np.sum(y_lengths) == num_samples)
 
+# This code block just creates a numpy array of the correct size and dimensions for the autoencoder
+# and then fills the array with the first 16 measures of that song
 print("Padding Songs...")
 x_shape = (num_songs * NUM_OFFSETS, 1)
 y_shape = (num_songs * NUM_OFFSETS, MAX_LENGTH) + y_samples.shape[1:] # (num_songs x 16 x 96 x 96)
@@ -168,10 +173,10 @@ else:
 		x = TimeDistributed(Dense(200, activation='relu'))(x) # (16 x 200)
 		print(K.int_shape(x))
 
-		x = Flatten()(x) # Flatten to 1D array (3200)
+		x = Flatten()(x) # Flatten to 1D array (3200,)
 		print(K.int_shape(x))
 
-		x = Dense(1600, activation='relu')(x) # (1600)
+		x = Dense(1600, activation='relu')(x) # (1600,)
 		print(K.int_shape(x))
 		
 		if USE_VAE:
@@ -187,15 +192,16 @@ else:
 	# END OF DECODER. NOW DATA GOES THROUGH ENCODER
 	#######################################################
 
-	x = Dense(1600, name='encoder')(x)
+	x = Dense(1600, name='encoder')(x) # (1600,)
 	x = BatchNormalization(momentum=BN_M)(x)
 	x = Activation('relu')(x)
 	if DO_RATE > 0:
 		x = Dropout(DO_RATE)(x)
 	print(K.int_shape(x))
 
-	x = Dense(MAX_LENGTH * 200)(x)
+	x = Dense(MAX_LENGTH * 200)(x) # (3200,)
 	print(K.int_shape(x))
+
 	x = Reshape((MAX_LENGTH, 200))(x)
 	x = TimeDistributed(BatchNormalization(momentum=BN_M))(x)
 	x = Activation('relu')(x)
@@ -222,14 +228,15 @@ else:
 		model = Model(x_in, x)
 		model.compile(optimizer=RMSprop(lr=LR), loss='binary_crossentropy')
 
-	plot_model(model, to_file='model.png', show_shapes=True)
+	# plot_model(model, to_file='model.png', show_shapes=True)
 
 ###################################
 #  Train
 ###################################
 print("Compiling SubModels...")
-func = K.function([model.get_layer('encoder').input, K.learning_phase()],
-				  [model.layers[-1].output])
+func_input = [model.get_layer('encoder').input, K.learning_phase()]
+func_output = [model.layers[-1].output]
+func = K.function(func_input, func_output) # Has to do with getting the output of an intermediate layer (pre-encoder) I think
 enc = Model(inputs=model.input, outputs=model.get_layer('pre_encoder').output)
 
 rand_vecs = np.random.normal(0.0, 1.0, (NUM_RAND_SONGS, PARAM_SIZE))
@@ -239,7 +246,7 @@ def make_rand_songs(write_dir, rand_vecs):
 	for i in range(rand_vecs.shape[0]):
 		x_rand = rand_vecs[i:i+1]
 		y_song = func([x_rand, 0])[0]
-		midi.samples_to_midi(y_song[0], write_dir + 'rand' + str(i) + '.mid', 16, 0.25)
+		midi.samples_to_midi([y_song[0, meas] for meas in range(y_song[0].ndim)], write_dir + 'rand' + str(i) + '.mid',thresh=0.25)
 
 def make_rand_songs_normalized(write_dir, rand_vecs):
 	if USE_EMBEDDING:
@@ -344,8 +351,9 @@ for iter in range(NUM_EPOCHS):
 			y_song = model.predict(x_test_song, batch_size=BATCH_SIZE)[0]
 		else:
 			y_song = model.predict(y_test_song, batch_size=BATCH_SIZE)[0]
-		util.samples_to_pics(write_dir + 'test', y_song)
-		midi.samples_to_midi(y_song, write_dir + 'test.mid', 16)
+		# util.samples_to_pics(write_dir + 'test', y_song)
+
+		midi.samples_to_midi([y_song[meas] for meas in range(y_song.shape[0])], write_dir + 'test.mid')
 
 		make_rand_songs_normalized(write_dir, rand_vecs)
 
