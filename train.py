@@ -330,7 +330,7 @@ for iter in range(NUM_EPOCHS):
 	print("Train Loss: " + str(train_loss[-1]))
 	
 	if WRITE_HISTORY:
-		plotScores(train_loss, 'History/Scores.png', True)
+		plotScores(train_loss, '../nn_output/History/Scores.png', True)
 	else:
 		plotScores(train_loss, 'Scores.png', True)
 	
