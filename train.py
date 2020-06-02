@@ -6,14 +6,38 @@ import pydot
 import util
 import midi
 
+###################################
+#  Load Keras
+###################################
+print("Loading Keras...")
+import os, math
+
+import tensorflow
+import keras
+print("Keras Version: " + keras.__version__)
+from keras.layers import Input, Dense, Activation, Dropout, Flatten, Reshape, TimeDistributed, Lambda 
+from keras.layers import Embedding
+from keras.layers import BatchNormalization
+from keras.losses import binary_crossentropy
+from keras.models import Model, Sequential, load_model
+from keras.optimizers import Adam, RMSprop, SGD
+from keras.preprocessing.image import ImageDataGenerator
+from keras.regularizers import l2
+from keras.utils import plot_model
+from keras import backend as K
+from keras import regularizers
+from keras.layers import Layer
+K.set_image_data_format('channels_first')
+
+
 # NUM_EPOCHS = 2000
-NUM_EPOCHS = 200 # This low number is temporary. Should be used only until we can use a GPU
+NUM_EPOCHS = 22 # This low number is temporary. Should be used only until we can use a GPU
 LR = 0.001
 CONTINUE_TRAIN = False
 PLAY_ONLY = False
 USE_EMBEDDING = False
 USE_VAE = False
-WRITE_HISTORY = True
+WRITE_HISTORY = False 
 NUM_RAND_SONGS = 10
 DO_RATE = 0.1
 BN_M = 0.9
@@ -24,6 +48,8 @@ BATCH_SIZE = 350
 MAX_LENGTH = 16
 PARAM_SIZE = 120
 NUM_OFFSETS = 16 if USE_EMBEDDING else 1
+
+
 
 def plotScores(scores, fname, on_top=True):
 	plt.clf()
@@ -47,41 +73,6 @@ def save_config():
 		fout.write('DO_RATE:     ' + str(DO_RATE) + '\n')
 		fout.write('num_songs:   ' + str(num_songs) + '\n')
 		fout.write('optimizer:   ' + type(model.optimizer).__name__ + '\n')
-
-###################################
-#  Load Keras
-###################################
-print("Loading Keras...")
-import os, math
-
-# Might not need theano. Come back to this later
-# os.environ['THEANORC'] = "./gpu.theanorc"
-# os.environ['KERAS_BACKEND'] = "theano"
-# import theano
-# print("Theano Version: " + theano.__version__)
-
-import tensorflow
-import keras
-print("Keras Version: " + keras.__version__)
-from keras.layers import Input, Dense, Activation, Dropout, Flatten, Reshape, Permute, RepeatVector, ActivityRegularization, TimeDistributed, Lambda, SpatialDropout1D
-from keras.layers import Conv1D, Conv2D, Conv2DTranspose, UpSampling2D, ZeroPadding2D
-from keras.layers import Embedding
-from keras.layers import LocallyConnected2D
-from keras.layers import MaxPooling2D, AveragePooling2D
-from keras.layers import GaussianNoise
-from keras.layers import BatchNormalization
-from keras.layers import LSTM, SimpleRNN # Not used??
-from keras.initializers import RandomNormal
-from keras.losses import binary_crossentropy
-from keras.models import Model, Sequential, load_model
-from keras.optimizers import Adam, RMSprop, SGD
-from keras.preprocessing.image import ImageDataGenerator
-from keras.regularizers import l2
-from keras.utils import plot_model
-from keras import backend as K
-from keras import regularizers
-from keras.layers import Layer
-K.set_image_data_format('channels_first')
 
 
 #Fix the random seed so that training comparisons are easier to make
@@ -143,7 +134,7 @@ def vae_loss(x, x_decoded_mean):
 	kl_loss = VAE_B2 * K.mean(1 + z_log_sigma_sq - K.square(z_mean) - K.exp(z_log_sigma_sq), axis=None)
 	return xent_loss - kl_loss
 	
-test_ix = 0
+test_ix = 120
 y_test_song = np.copy(y_train[test_ix:test_ix+1])
 x_test_song = np.copy(x_train[test_ix:test_ix+1])
 midi.samples_to_midi(y_test_song[0], 'gt.mid', 16)
@@ -203,7 +194,7 @@ else:
 	x = Dense(MAX_LENGTH * 200)(x) # (3200,)
 	print(K.int_shape(x))
 
-	x = Reshape((MAX_LENGTH, 200))(x)
+	x = Reshape((MAX_LENGTH, 200))(x) # (16, 200)
 	x = TimeDistributed(BatchNormalization(momentum=BN_M))(x)
 	x = Activation('relu')(x)
 	if DO_RATE > 0:
@@ -309,6 +300,11 @@ save_config()
 train_loss = []
 ofs = 0
 
+#####################################################################################################
+# TRAINING
+# Trains the model over a series of epochs. Ever 10 or so epochs, the state of the model is saved and 
+# a new handful of songs is generated. 
+#####################################################################################################
 for iter in range(NUM_EPOCHS):
 	if USE_EMBEDDING:
 		history = model.fit(x_train, y_train, batch_size=BATCH_SIZE, epochs=1)
@@ -333,7 +329,8 @@ for iter in range(NUM_EPOCHS):
 		plotScores(train_loss, '../nn_output/History/Scores.png', True)
 	else:
 		plotScores(train_loss, 'Scores.png', True)
-	
+
+	# Done with training for this epoch. Now, save the model and create a new song	
 	i = iter + 1
 	# Represents the number of epochs that had passed
 	if i in [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450] or (i % 100 == 0):
@@ -344,7 +341,7 @@ for iter in range(NUM_EPOCHS):
 			if not os.path.exists(write_dir):
 				os.makedirs(write_dir)
 			write_dir += '/' # write_dir is now ../nn_output/e??/
-			model.save('../nn_output/History/model.h5')
+			model.save('../nn_output/History/model.h5') # Save a new model every few epochs
 		else:
 			model.save('model.h5')
 		print("Saved")
