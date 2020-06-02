@@ -7,7 +7,7 @@ import util
 import midi
 
 # NUM_EPOCHS = 2000
-NUM_EPOCHS = 10 # This low number is temporary. Should be used only until we can use a GPU
+NUM_EPOCHS = 200 # This low number is temporary. Should be used only until we can use a GPU
 LR = 0.001
 CONTINUE_TRAIN = False
 PLAY_ONLY = False
@@ -60,29 +60,29 @@ import os, math
 # import theano
 # print("Theano Version: " + theano.__version__)
 
-import tensorflow.keras
-print("Keras Version: " + tensorflow.keras.__version__)
-from tensorflow.keras.layers import Input, Dense, Activation, Dropout, Flatten, Reshape, Permute, RepeatVector, ActivityRegularization, TimeDistributed, Lambda, SpatialDropout1D
-from tensorflow.keras.layers import Conv1D, Conv2D, Conv2DTranspose, UpSampling2D, ZeroPadding2D
-from tensorflow.keras.layers import Embedding
-from tensorflow.keras.layers import LocallyConnected2D
-from tensorflow.keras.layers import MaxPooling2D, AveragePooling2D
-from tensorflow.keras.layers import GaussianNoise
-from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import LSTM, SimpleRNN # Not used??
-from tensorflow.keras.initializers import RandomNormal
-from tensorflow.keras.losses import binary_crossentropy
-from tensorflow.keras.models import Model, Sequential, load_model
-from tensorflow.keras.optimizers import Adam, RMSprop, SGD
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras.utils import plot_model
-from tensorflow.keras import backend as K
-from tensorflow.keras import regularizers
-from tensorflow.keras.layers import Layer
+import tensorflow
+import keras
+print("Keras Version: " + keras.__version__)
+from keras.layers import Input, Dense, Activation, Dropout, Flatten, Reshape, Permute, RepeatVector, ActivityRegularization, TimeDistributed, Lambda, SpatialDropout1D
+from keras.layers import Conv1D, Conv2D, Conv2DTranspose, UpSampling2D, ZeroPadding2D
+from keras.layers import Embedding
+from keras.layers import LocallyConnected2D
+from keras.layers import MaxPooling2D, AveragePooling2D
+from keras.layers import GaussianNoise
+from keras.layers import BatchNormalization
+from keras.layers import LSTM, SimpleRNN # Not used??
+from keras.initializers import RandomNormal
+from keras.losses import binary_crossentropy
+from keras.models import Model, Sequential, load_model
+from keras.optimizers import Adam, RMSprop, SGD
+from keras.preprocessing.image import ImageDataGenerator
+from keras.regularizers import l2
+from keras.utils import plot_model
+from keras import backend as K
+from keras import regularizers
+from keras.layers import Layer
 K.set_image_data_format('channels_first')
 
-tensorflow.compat.v1.disable_eager_execution() # So that K.function works
 
 #Fix the random seed so that training comparisons are easier to make
 np.random.seed(0)
@@ -105,8 +105,9 @@ print("Loaded " + str(num_samples) + " samples from " + str(num_songs) + " songs
 print(np.sum(y_lengths))
 assert(np.sum(y_lengths) == num_samples)
 
-# This code block just creates a numpy array of the correct size and dimensions for the autoencoder
-# and then fills the array with the first 16 measures of that song
+#############################################################################
+# Fill an input numpy array with data
+#############################################################################
 print("Padding Songs...")
 x_shape = (num_songs * NUM_OFFSETS, 1)
 y_shape = (num_songs * NUM_OFFSETS, MAX_LENGTH) + y_samples.shape[1:] # (num_songs x 16 x 96 x 96)
@@ -228,7 +229,7 @@ else:
 		model = Model(x_in, x)
 		model.compile(optimizer=RMSprop(lr=LR), loss='binary_crossentropy')
 
-	# plot_model(model, to_file='model.png', show_shapes=True)
+	#plot_model(model, to_file='model.png', show_shapes=True)
 
 ###################################
 #  Train
@@ -334,15 +335,16 @@ for iter in range(NUM_EPOCHS):
 		plotScores(train_loss, 'Scores.png', True)
 	
 	i = iter + 1
+	# Represents the number of epochs that had passed
 	if i in [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200, 250, 300, 350, 400, 450] or (i % 100 == 0):
-		write_dir = ''
+		write_dir = '../nn_output/History/'
 		if WRITE_HISTORY:
 			#Create folder to save models into
-			write_dir = 'History/e' + str(i)
+			write_dir += 'e' + str(i)
 			if not os.path.exists(write_dir):
 				os.makedirs(write_dir)
-			write_dir += '/'
-			model.save('History/model.h5')
+			write_dir += '/' # write_dir is now ../nn_output/e??/
+			model.save('../nn_output/History/model.h5')
 		else:
 			model.save('model.h5')
 		print("Saved")

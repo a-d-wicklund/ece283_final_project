@@ -17,7 +17,7 @@ all_lens = []
 print("Loading Songs...")
 
 
-for root, _, files in os.walk('./Classical_Piano_piano-midi.de_MIDIRip/mozart', topdown=False):  # Was testing with single folder
+for root, _, files in os.walk('./Classical_Piano_piano-midi.de_MIDIRip', topdown=False):  # Was testing with single folder
     for file in files:
         path = os.path.join(root, file)
         if not (path.endswith('.mid') or path.endswith('.midi')):
