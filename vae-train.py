@@ -29,7 +29,8 @@ import matplotlib.pyplot as plt
 import argparse
 import os
 
-
+import midi
+import load_songs
 
 
 # reparameterization trick
@@ -65,28 +66,22 @@ def plot_results(models,
         batch_size (int): prediction batch size
         model_name (string): which model is using this function
     """
+    dirname = os.path.join('..', 'nn_output', model_name)
 
     encoder, decoder = models
     x_test, y_test = data
-    os.makedirs(model_name, exist_ok=True)
+    os.makedirs(dirname, exist_ok=True)
 
-    filename = os.path.join(model_name, "vae_mean.png")
+    filename = os.path.join(dirname, "vae_mean.png")
     # display a 2D plot of the digit classes in the latent space
     z_mean, _, _ = encoder.predict(x_test,
                                    batch_size=batch_size)
-    plt.figure(figsize=(12, 10))
-    plt.scatter(z_mean[:, 0], z_mean[:, 1], c=y_test)
-    plt.colorbar()
-    plt.xlabel("z[0]")
-    plt.ylabel("z[1]")
-    plt.savefig(filename)
-    plt.show()
 
-    filename = os.path.join(model_name, "digits_over_latent.png")
+    filename = os.path.join(dirname, "digits_over_latent.png")
     # display a 30x30 2D manifold of digits
     n = 30
-    digit_size = 28
-    figure = np.zeros((digit_size * n, digit_size * n))
+    measure_size = 96
+    figure = np.zeros((measure_size * n, measure_size * n))
     # linearly spaced coordinates corresponding to the 2D plot
     # of digit classes in the latent space
     grid_x = np.linspace(-4, 4, n)
@@ -117,8 +112,8 @@ def plot_results(models,
 
 # MNIST dataset
 # (x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_all = load_songs.main()
-
+x_all  = load_songs.main(from_file=True)
+#x_all = np.load(samples.npy)
 # Use 90% of the data for training and the other 10% for testing
 x_train = x_all[:x_all.shape[0]*9//10]
 x_test = x_all[x_all.shape[0]*9//10:]
@@ -129,15 +124,17 @@ image_size = x_train.shape[1]
 original_dim = image_size * image_size
 x_train = np.reshape(x_train, [-1, original_dim])
 x_test = np.reshape(x_test, [-1, original_dim])
-x_train = x_train.astype('float32') / 255
-x_test = x_test.astype('float32') / 255
+#x_train = x_train.astype('float32') / 255
+#x_test = x_test.astype('float32') / 255
 
+assert(x_test.shape[1] == 96*96)
+print('\n\nSHAPE OF x_test: ', x_test[0].shape)
 # network parameters
 input_shape = (original_dim, )
 intermediate_dim = 512
 batch_size = 128
 latent_dim = 2
-epochs = 50
+epochs = 10
 
 # VAE model = encoder + decoder
 # build encoder model
@@ -180,7 +177,7 @@ if __name__ == '__main__':
                         help=help_, action='store_true')
     args = parser.parse_args()
     models = (encoder, decoder)
-    data = (x_test, y_test)
+    #data = (x_test, y_test)
 
     # VAE loss = mse_loss or xent_loss + kl_loss
     if args.mse:
@@ -211,7 +208,14 @@ if __name__ == '__main__':
                 validation_data=(x_test, None))
         vae.save_weights('vae_mlp_mnist.h5')
 
-    plot_results(models,
-                 data,
-                 batch_size=batch_size,
-                 model_name="vae_mlp")
+    # Grab example output from the autoencoder
+    sample_test = x_test[0]
+    x_decoded = vae.predict(np.array([sample_test]))
+    midi.samples_to_midi([np.reshape(x_decoded[0], [96, 96])], 'simple_vae_output.mid')
+    midi.samples_to_midi([np.reshape(sample_test, [96, 96])], 'vae_input.mid')
+    
+
+#    plot_results(models,
+#                 data,
+#                 batch_size=batch_size,
+#                 model_name="vae_midi")

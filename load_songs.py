@@ -10,13 +10,15 @@ import os
 import util
 import numpy as np
 
-def main():
+def main(from_file=True):
 
+    if from_file:
+        return np.load('samples.npy')
     patterns = {}
     all_samples = []
     all_lens = []
 
-    SAVE_SONGS = False
+    SAVE_SONGS = True
     print("Loading Songs...")
 
 
