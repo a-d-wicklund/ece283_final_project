@@ -53,6 +53,24 @@ def sampling(args):
     epsilon = K.random_normal(shape=(batch, dim))
     return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
+def save_models(models):
+    encoder, decoder, vae = models
+    model_encoder_json = encoder.to_json()
+    with open("archived/model_encoder.json", "w") as json_file:
+        json_file.write(model_encoder_json)
+    model_decoder_json = decoder.to_json()
+    with open('archived/model_decoder.json', 'w') as json_file:
+        json_file.write(model_decoder_json)
+    model_vae_json = vae.to_json()
+    with open('archived/model_vae.json', 'w') as json_file:
+        json_file.write(model_vae_json) 
+
+
+def save_training_history(history):
+    np.save('archived/val_loss.npy', history['val_loss'])
+    np.save('archived/loss.npy', history['loss']) 
+
+
 
 def plot_results(models,
                  data,
@@ -87,36 +105,14 @@ def plot_results(models,
     grid_x = np.linspace(-4, 4, n)
     grid_y = np.linspace(-4, 4, n)[::-1]
 
-    for i, yi in enumerate(grid_y):
-        for j, xi in enumerate(grid_x):
-            z_sample = np.array([[xi, yi]])
-            x_decoded = decoder.predict(z_sample)
-            digit = x_decoded[0].reshape(digit_size, digit_size)
-            figure[i * digit_size: (i + 1) * digit_size,
-                   j * digit_size: (j + 1) * digit_size] = digit
-
-    plt.figure(figsize=(10, 10))
-    start_range = digit_size // 2
-    end_range = (n - 1) * digit_size + start_range + 1
-    pixel_range = np.arange(start_range, end_range, digit_size)
-    sample_range_x = np.round(grid_x, 1)
-    sample_range_y = np.round(grid_y, 1)
-    plt.xticks(pixel_range, sample_range_x)
-    plt.yticks(pixel_range, sample_range_y)
-    plt.xlabel("z[0]")
-    plt.ylabel("z[1]")
-    plt.imshow(figure, cmap='Greys_r')
-    plt.savefig(filename)
-    plt.show()
-
 
 # MNIST dataset
 # (x_train, y_train), (x_test, y_test) = mnist.load_data()
 x_all = load_songs.main(from_file=True)
-x_all = np.random.shuffle(x_all)
 #x_all = np.load(samples.npy)
 # Use 90% of the data for training and the other 10% for testing
 x_train = x_all[:x_all.shape[0]*9//10]
+np.random.shuffle(x_train) # Shuffle so that each batch has variety
 x_test = x_all[x_all.shape[0]*9//10:]
 
 
@@ -135,7 +131,7 @@ input_shape = (original_dim, )
 intermediate_dim = 1024
 batch_size = 256
 latent_dim = 100
-epochs = 100
+epochs = 50
 
 # VAE model = encoder + decoder
 # build encoder model
@@ -178,6 +174,7 @@ if __name__ == '__main__':
                         help=help_, action='store_true')
     args = parser.parse_args()
     models = (encoder, decoder)
+    save_models((encoder, decoder, vae))
     #data = (x_test, y_test)
 
     # VAE loss = mse_loss or xent_loss + kl_loss
@@ -203,19 +200,20 @@ if __name__ == '__main__':
         vae.load_weights(args.weights)
     else:
         # train the autoencoder
-        vae.fit(x_train,
+        history = vae.fit(x_train,
                 epochs=epochs,
                 batch_size=batch_size,
                 validation_data=(x_test, None))
         vae.save_weights('vae_mlp_mnist.h5')
-
+    save_training_history(history)	
+    
     # Grab example output from the autoencoder
     sample_test = x_test[:10]
     x_decoded = vae.predict(sample_test)
     midi.samples_to_midi([np.reshape(x_decoded, [-1, 96, 96])[me] for me in range(10)], 'simple_vae_output.mid')
     midi.samples_to_midi([np.reshape(sample_test, [-1, 96, 96])[me] for me in range(10)], 'vae_input.mid')
     
-    save_results(models, x_test, batch) 
+    #save_results(models, x_test, batch) 
 
 #    plot_results(models,
 #                 data,
