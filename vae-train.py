@@ -131,9 +131,9 @@ assert(x_test.shape[1] == 96*96)
 print('\n\nSHAPE OF x_test: ', x_test[0].shape)
 # network parameters
 input_shape = (original_dim, )
-intermediate_dim = 512
+intermediate_dim = 1024
 batch_size = 128
-latent_dim = 2
+latent_dim = 100
 epochs = 10
 
 # VAE model = encoder + decoder
@@ -209,10 +209,10 @@ if __name__ == '__main__':
         vae.save_weights('vae_mlp_mnist.h5')
 
     # Grab example output from the autoencoder
-    sample_test = x_test[0]
-    x_decoded = vae.predict(np.array([sample_test]))
-    midi.samples_to_midi([np.reshape(x_decoded[0], [96, 96])], 'simple_vae_output.mid')
-    midi.samples_to_midi([np.reshape(sample_test, [96, 96])], 'vae_input.mid')
+    sample_test = x_test[:10]
+    x_decoded = vae.predict(sample_test)
+    midi.samples_to_midi([np.reshape(x_decoded, [96, 96])[me] for me in range(10)], 'simple_vae_output.mid')
+    midi.samples_to_midi([np.reshape(sample_test, [96, 96])[me] for me in range(10)], 'vae_input.mid')
     
 
 #    plot_results(models,
