@@ -56,8 +56,8 @@ def sampling(args):
 
 def plot_results(models,
                  data,
-                 batch_size=128,
-                 model_name="vae_mnist"):
+                 batch_size=32,
+                 model_name="vae_piano"):
     """Plots labels and MNIST digits as a function of the 2D latent vector
 
     # Arguments
@@ -112,7 +112,8 @@ def plot_results(models,
 
 # MNIST dataset
 # (x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_all  = load_songs.main(from_file=True)
+x_all = load_songs.main(from_file=True)
+x_all = np.random.shuffle(x_all)
 #x_all = np.load(samples.npy)
 # Use 90% of the data for training and the other 10% for testing
 x_train = x_all[:x_all.shape[0]*9//10]
@@ -132,9 +133,9 @@ print('\n\nSHAPE OF x_test: ', x_test[0].shape)
 # network parameters
 input_shape = (original_dim, )
 intermediate_dim = 1024
-batch_size = 128
+batch_size = 256
 latent_dim = 100
-epochs = 10
+epochs = 100
 
 # VAE model = encoder + decoder
 # build encoder model
@@ -211,9 +212,10 @@ if __name__ == '__main__':
     # Grab example output from the autoencoder
     sample_test = x_test[:10]
     x_decoded = vae.predict(sample_test)
-    midi.samples_to_midi([np.reshape(x_decoded, [96, 96])[me] for me in range(10)], 'simple_vae_output.mid')
-    midi.samples_to_midi([np.reshape(sample_test, [96, 96])[me] for me in range(10)], 'vae_input.mid')
+    midi.samples_to_midi([np.reshape(x_decoded, [-1, 96, 96])[me] for me in range(10)], 'simple_vae_output.mid')
+    midi.samples_to_midi([np.reshape(sample_test, [-1, 96, 96])[me] for me in range(10)], 'vae_input.mid')
     
+    save_results(models, x_test, batch) 
 
 #    plot_results(models,
 #                 data,
