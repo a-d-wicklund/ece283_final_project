@@ -25,13 +25,15 @@ from keras.utils import plot_model
 from keras import backend as K
 
 import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
 import argparse
 import os
+from datetime import datetime
 
 import midi
 import load_songs
 
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
 
 # reparameterization trick
 # instead of sampling from Q(z|X), sample epsilon = N(0,I)
@@ -67,46 +69,50 @@ def save_models(models):
 
 
 def save_training_history(history):
-    np.save('archived/val_loss.npy', history['val_loss'])
-    np.save('archived/loss.npy', history['loss']) 
+    np.save('archived/val_loss.npy', history.history['val_loss'])
+    np.save('archived/loss.npy', history.history['loss']) 
 
 
 
-def plot_results(models,
-                 data,
-                 batch_size=32,
-                 model_name="vae_piano"):
-    """Plots labels and MNIST digits as a function of the 2D latent vector
-
-    # Arguments
-        models (tuple): encoder and decoder models
-        data (tuple): test data and label
-        batch_size (int): prediction batch size
-        model_name (string): which model is using this function
-    """
-    dirname = os.path.join('..', 'nn_output', model_name)
-
+def create_samples(models, x_test, latent_dim):
+    variance_mult = 2
     encoder, decoder = models
-    x_test, y_test = data
-    os.makedirs(dirname, exist_ok=True)
+    z_mean, z_log_var, z = encoder.predict(x_test, batch_size=x_test.shape[0])
+    epsilon = np.random.normal(size=(x_test.shape[0], latent_dim))
+    latent_vec = z_mean + variance_mult * np.exp(0.5 * z_log_var) * epsilon
+    samples_out = decoder.predict(latent_vec, batch_size=x_test.shape[0])
+    # Save mean histogram
+    np.save('z_mean_smallbeta.npy', z_mean)
+    #plt.hist(z_mean)
+    #plt.title('Histogram of latent space mean: beta = 5')
+    #plt.xlabel('Mean produced in latent space')
+    return samples_out
+#def plot_results(models,
+#                 data,
+#                 batch_size=32,
+#                 model_name="vae_piano"):
+#    """Plots labels and MNIST digits as a function of the 2D latent vector
+#
+#    # Arguments
+#        models (tuple): encoder and decoder models
+#        data (tuple): test data and label
+#        batch_size (int): prediction batch size
+#        model_name (string): which model is using this function
+#    """
+#    dirname = os.path.join('..', 'nn_output', model_name)
+#
+#    encoder, decoder = models
+#    x_test, y_test = data
+#    os.makedirs(dirname, exist_ok=True)
+#
+#    filename = os.path.join(dirname, "vae_mean.png")
+#    # display a 2D plot of the digit classes in the latent space
+#    z_mean, _, _ = encoder.predict(x_test,
+#                                   batch_size=batch_size)
+#
 
-    filename = os.path.join(dirname, "vae_mean.png")
-    # display a 2D plot of the digit classes in the latent space
-    z_mean, _, _ = encoder.predict(x_test,
-                                   batch_size=batch_size)
 
-    filename = os.path.join(dirname, "digits_over_latent.png")
-    # display a 30x30 2D manifold of digits
-    n = 30
-    measure_size = 96
-    figure = np.zeros((measure_size * n, measure_size * n))
-    # linearly spaced coordinates corresponding to the 2D plot
-    # of digit classes in the latent space
-    grid_x = np.linspace(-4, 4, n)
-    grid_y = np.linspace(-4, 4, n)[::-1]
-
-
-# MNIST dataset
+# Grab data
 # (x_train, y_train), (x_test, y_test) = mnist.load_data()
 x_all = load_songs.main(from_file=True)
 #x_all = np.load(samples.npy)
@@ -117,21 +123,19 @@ x_test = x_all[x_all.shape[0]*9//10:]
 
 
 
-image_size = x_train.shape[1]
-original_dim = image_size * image_size
+original_dim = x_train.shape[1] * x_train.shape[2]
 x_train = np.reshape(x_train, [-1, original_dim])
 x_test = np.reshape(x_test, [-1, original_dim])
 #x_train = x_train.astype('float32') / 255
 #x_test = x_test.astype('float32') / 255
 
-assert(x_test.shape[1] == 96*96)
-print('\n\nSHAPE OF x_test: ', x_test[0].shape)
 # network parameters
 input_shape = (original_dim, )
 intermediate_dim = 1024
 batch_size = 256
 latent_dim = 100
 epochs = 50
+beta = 5 #multiplier for kl divergence
 
 # VAE model = encoder + decoder
 # build encoder model
@@ -188,7 +192,8 @@ if __name__ == '__main__':
     kl_loss = 1 + z_log_var - K.square(z_mean) - K.exp(z_log_var)
     kl_loss = K.sum(kl_loss, axis=-1)
     kl_loss *= -0.5
-    vae_loss = K.mean(reconstruction_loss + kl_loss)
+    vae_loss = K.mean(reconstruction_loss)
+    #vae_loss = K.mean(reconstruction_loss + beta * kl_loss)
     vae.add_loss(vae_loss)
     vae.compile(optimizer='adam')
     vae.summary()
@@ -205,13 +210,14 @@ if __name__ == '__main__':
                 batch_size=batch_size,
                 validation_data=(x_test, None))
         vae.save_weights('vae_mlp_mnist.h5')
-    save_training_history(history)	
+        save_training_history(history)	
     
     # Grab example output from the autoencoder
-    sample_test = x_test[:10]
-    x_decoded = vae.predict(sample_test)
-    midi.samples_to_midi([np.reshape(x_decoded, [-1, 96, 96])[me] for me in range(10)], 'simple_vae_output.mid')
-    midi.samples_to_midi([np.reshape(sample_test, [-1, 96, 96])[me] for me in range(10)], 'vae_input.mid')
+    sample_test = x_test[2000:2100]
+    #x_decoded = vae.predict(sample_test, batch_size=100)
+    #midi.samples_to_midi([np.reshape(x_decoded, [-1, 96, 96])[me] for me in range(10)], '../nn_output/vae_output_' + datetime.now().strftime('%H%M') + '.mid')
+    #midi.samples_to_midi([np.reshape(sample_test, [-1, 96, 96])[me] for me in range(10)], '../nn_output/vae_input_' + datetime.now().strftime('%H%M') + '.mid')
+    samples_out = create_samples((encoder, decoder), x_test[1000:10000], latent_dim=latent_dim) 
     
     #save_results(models, x_test, batch) 
 
