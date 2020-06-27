@@ -1,18 +1,12 @@
-'''Example of VAE on MNIST dataset using MLP
 
-The VAE has a modular design. The encoder, decoder and VAE
-are 3 models that share weights. After training the VAE model,
-the encoder can be used to generate latent vectors.
-The decoder can be used to generate MNIST digits by sampling the
-latent vector from a Gaussian distribution with mean = 0 and std = 1.
+'''VAE for Random Music Generation
 
-# Reference
+This module trains a VAE model on piano music in MIDI format and produces new measures of music based 
+on an input sample. The music produced will be distinct from the input sample, but will bear enough 
+resemblance to "belong" in the same song. The idea is that once a partial melody is created by a musician,
+he or she can plug it into our model and produce subsequent measures to complete the song.
 
-[1] Kingma, Diederik P., and Max Welling.
-"Auto-Encoding Variational Bayes."
-https://arxiv.org/abs/1312.6114
 '''
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -35,25 +29,6 @@ import load_songs
 
 os.environ["CUDA_VISIBLE_DEVICES"]="2"
 
-# reparameterization trick
-# instead of sampling from Q(z|X), sample epsilon = N(0,I)
-# z = z_mean + sqrt(var) * epsilon
-def sampling(args):
-    """Reparameterization trick by sampling from an isotropic unit Gaussian.
-
-    # Arguments
-        args (tensor): mean and log of variance of Q(z|X)
-
-    # Returns
-        z (tensor): sampled latent vector
-    """
-
-    z_mean, z_log_var = args
-    batch = K.shape(z_mean)[0]
-    dim = K.int_shape(z_mean)[1]
-    # by default, random_normal has mean = 0 and std = 1.0
-    epsilon = K.random_normal(shape=(batch, dim))
-    return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
 def save_models(models):
     encoder, decoder, vae = models
@@ -90,7 +65,6 @@ def create_samples(models, x_test, latent_dim):
 
 
 # Grab data
-# (x_train, y_train), (x_test, y_test) = mnist.load_data()
 x_all = load_songs.main(from_file=True)
 #x_all = np.load(samples.npy)
 # Use 90% of the data for training and the other 10% for testing
@@ -103,16 +77,14 @@ x_test = x_all[x_all.shape[0]*9//10:]
 original_dim = x_train.shape[1] * x_train.shape[2]
 x_train = np.reshape(x_train, [-1, original_dim])
 x_test = np.reshape(x_test, [-1, original_dim])
-#x_train = x_train.astype('float32') / 255
-#x_test = x_test.astype('float32') / 255
 
 # network parameters
 input_shape = (original_dim, )
 intermediate_dim = 1024
 batch_size = 256
-latent_dim = 2
+latent_dim = 20
 epochs = 50
-beta = 5 #multiplier for kl divergence
+beta = 1 #multiplier for kl divergence
 
 # VAE model = encoder + decoder
 # build encoder model
@@ -196,9 +168,3 @@ if __name__ == '__main__':
     #midi.samples_to_midi([np.reshape(sample_test, [-1, 96, 96])[me] for me in range(10)], '../nn_output/vae_input_' + datetime.now().strftime('%H%M') + '.mid')
     samples_out = create_samples((encoder, decoder), x_test[1000:10000], latent_dim=latent_dim) 
     
-    #save_results(models, x_test, batch) 
-
-#    plot_results(models,
-#                 data,
-#                 batch_size=batch_size,
-#                 model_name="vae_midi")
