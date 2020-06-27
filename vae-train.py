@@ -87,29 +87,6 @@ def create_samples(models, x_test, latent_dim):
     #plt.title('Histogram of latent space mean: beta = 5')
     #plt.xlabel('Mean produced in latent space')
     return samples_out
-#def plot_results(models,
-#                 data,
-#                 batch_size=32,
-#                 model_name="vae_piano"):
-#    """Plots labels and MNIST digits as a function of the 2D latent vector
-#
-#    # Arguments
-#        models (tuple): encoder and decoder models
-#        data (tuple): test data and label
-#        batch_size (int): prediction batch size
-#        model_name (string): which model is using this function
-#    """
-#    dirname = os.path.join('..', 'nn_output', model_name)
-#
-#    encoder, decoder = models
-#    x_test, y_test = data
-#    os.makedirs(dirname, exist_ok=True)
-#
-#    filename = os.path.join(dirname, "vae_mean.png")
-#    # display a 2D plot of the digit classes in the latent space
-#    z_mean, _, _ = encoder.predict(x_test,
-#                                   batch_size=batch_size)
-#
 
 
 # Grab data
@@ -133,13 +110,13 @@ x_test = np.reshape(x_test, [-1, original_dim])
 input_shape = (original_dim, )
 intermediate_dim = 1024
 batch_size = 256
-latent_dim = 100
+latent_dim = 2
 epochs = 50
 beta = 5 #multiplier for kl divergence
 
 # VAE model = encoder + decoder
 # build encoder model
-# For midi application, take 
+# For midi application, take
 inputs = Input(shape=input_shape, name='encoder_input')
 x = Dense(intermediate_dim, activation='relu')(inputs)
 z_mean = Dense(latent_dim, name='z_mean')(x)
