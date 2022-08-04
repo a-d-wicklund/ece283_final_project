@@ -13,7 +13,7 @@ language-selector==0.1
 Markdown==3.0.1
 numpy==1.15.4
 opencv-contrib-python==3.4.0.12
-opencv-python==3.4.0.12
+opencv-python==4.2.0.32
 Pillow==9.0.1
 protobuf==3.6.1
 pycurl==7.43.0
